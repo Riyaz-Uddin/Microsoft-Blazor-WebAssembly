@@ -1,0 +1,278 @@
+﻿@page "/DoctorPatientPage"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using CrudWebAssemblyR51.Shared
+@attribute [Authorize]
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<div class="container">
+    <div class="row">
+
+        <div class="col-sm-4">
+            <h2>Doctor</h2>
+            <hr />
+            <div class="form-group">
+                <label for="Doctor_Code" class="control-label">Doctor Code</label>
+                <input id="Doctor_Code" class="form-control" @bind="@mas.Doctor_Code" @bind:event="oninput" @onkeyup="@(()=>Get2Tables())" />
+            </div>
+            <div class="form-group">
+                <label for="DoctorName" class="control-label">Doctor Name</label>
+                <input id="DoctorName" class="form-control" @bind="@mas.DoctorName" />
+            </div>
+            <div class="form-group">
+                <label for="Gender" class="control-label">Gender</label>
+                <input id="Gender" class="form-control" @bind="@mas.Gender" />
+            </div>
+            <div class="form-group">
+                <label for="Address" class="control-label">Address</label>
+                <input id="Address" class="form-control" @bind="@mas.Address" />
+            </div>
+            <div class="form-group">
+                <label for="Tel" class="control-label">Tel</label>
+                <input id="Tel" class="form-control" @bind="@mas.Tel" />
+            </div>
+            <div class="form-group">
+                <label for="Designation" class="control-label">Designation</label>
+                <input id="Designation" class="form-control" @bind="@mas.Designation" />
+            </div>
+
+        </div>
+        <div class="col-sm-8">
+            <h2>Patient</h2>
+            <div class="form-group">
+                <label for="Patient_Id" class="control-label">Patient Id</label>
+                <input id="Patient_Id" name="Patient_Id" @bind="@obj.Patient_Id" class="form-control" />
+                <div id="slerror" style="color:red"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="PatinetName" class="control-label">Patinet Name</label>
+                <input id="PatinetName" @bind="@obj.PatientName" class="form-control" />
+            </div>
+            <div class="form-group">
+                <label for="Gender" class="control-label">Gender</label>
+                <input id="Gender" @bind="@obj.Gender" class="form-control" />
+            </div>
+            <div class="form-group">
+                <label for="Number" class="control-label">Number</label>
+                <input id="Number" @bind="@obj.Number" class="form-control" />
+            </div>
+            <div class="form-group">
+                <label for="Date" class="control-label">Date</label>
+                <input type="date" id="Date" @bind="@obj.Date" class="form-control" />
+            </div>
+            <div class="form-group">
+                <label for="Active" class="control-label">Active</label>
+                <input type="checkbox" id="Active" @bind="@obj.Active" />
+            </div>
+            <div class="form-group">
+                <label for="Image" class="control-label">Image</label>
+                <input id="Image" @bind="@obj.Image" class="form-control" />
+                <InputFile OnChange="OnChange" id="Image" class="btn-primary" />
+                <div class="input-group-append">
+                    <button class="btn btn-success" @onclick="@Upload" disabled="@isDisabled">Upload</button>
+                </div>
+            </div>
+
+            <hr />
+            <div class="form-group">
+                <input type="button" value="Add" @onclick="@Add" class="btn btn-primary" />
+                <input type="button" value="Update" @onclick="@Update" class="btn btn-primary" />
+            </div>
+            
+            <h2>Patient Table</h2>
+            <table id="Patient" class="table">
+                <thead>
+                    <tr><th>SlNo</th><th>Patient_Id</th><th>PatientName</th><th>Gender</th><th>Number</th><th>Date</th><th>Active</th><th>Image</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @if (det is null)
+                    {
+                        <p><em>Loading... !</em></p>
+                    }
+                    else
+                    {
+                        int index = 1;
+                        @foreach (var a in det)
+                        {
+                            int sl2 = index - 1;
+                            <tr>
+                                <td>@index</td>
+                                <td>@a.Patient_Id</td>
+                                <td>@a.PatientName</td>
+                                <td>@a.Gender</td>
+                                <td>@a.Number</td>
+                                <td>@a.Date</td>
+                                <td>@a.Active</td>
+                                <td><img src="/uploads/@a.Image" width="100" /></td>
+                                <td>
+                                    <a class="nav-link" @onclick="@(() =>Show(@a.Patient_Id,@a.PatientName,@a.Gender,@a.Number,@sl2,@a.Date,@a.Active,@a.Image))">
+                                        <span class="oi oi-pencil" aria-hidden="true">@index Edit</span>
+                                    </a>
+                                    <a class="nav-link" @onclick="@(()=>Delete(@a.Patient_Id))">
+                                        <span class="oi oi-trash" aria-hidden="true">Delete</span>
+                                    </a>
+                                </td>
+                            </tr>
+                            index++;
+                        }
+                    }
+                </tbody>
+            </table>
+
+
+            <button type="button" class="btn btn-primary" @onclick="@CreateCustomer">Save</button>
+            <button type="button" class="btn btn-info" @onclick="@UpdateCustomer">Update</button>
+            <button type="button" class="btn btn-danger" @onclick="@DeleteCustomer">Delete</button>
+
+        </div>
+    </div>
+
+</div>
+
+
+
+
+@code {
+    List<ImageFile> filesBase64 = new List<ImageFile>();
+    string message = "InputFile";
+    bool isDisabled = false;
+
+    async Task OnChange(InputFileChangeEventArgs e)
+    {
+        var files = e.GetMultipleFiles(); // get the files selected by the users
+        foreach (var file in files)
+        {
+            var resizedFile = await file.RequestImageFileAsync(file.ContentType, 640, 480); // resize the image file
+            var buf = new byte[resizedFile.Size]; // allocate a buffer to fill with the file's data
+            using (var stream = resizedFile.OpenReadStream())
+            {
+                await stream.ReadAsync(buf); // copy the stream to the buffer
+            }
+            filesBase64.Add(new ImageFile { base64data = Convert.ToBase64String(buf), contentType = file.ContentType, fileName = file.Name }); // convert to a base64 string!!
+            obj.Image = file.Name;
+        }
+        message = "Click UPLOAD to continue";
+    }
+
+    async Task Upload()
+    {
+        isDisabled = true;
+        using (var msg = await Http.PostAsJsonAsync<List<ImageFile>>("/api/upload", filesBase64, System.Threading.CancellationToken.None))
+        {
+            isDisabled = false;
+            if (msg.IsSuccessStatusCode)
+            {
+                message = $"{filesBase64.Count} files uploaded";
+                filesBase64.Clear();
+            }
+        }
+    }
+
+    List<Patient> det = new List<Patient>();
+    int sl = 0;
+    Patient obj = new Patient();
+    Doctor mas = new Doctor();
+    protected override async Task OnInitializedAsync()
+    {
+        string p = "ll";
+    }
+    protected async void CreateCustomer()
+    {
+        DoctorPatientVM md = new DoctorPatientVM();
+        md.Doctors = mas;
+        md.Patients = det;
+        await Http.PostAsJsonAsync("api/DP/AddDoctorPatientVM", md);
+        Refresh();
+    }
+    protected async void Add()
+    {
+        det.Add(new Patient() { Patient_Id = obj.Patient_Id, PatientName = obj.PatientName, Doctor_Code = mas.Doctor_Code, Gender = obj.Gender, Number = obj.Number, Date = obj.Date, Active = obj.Active, Image = obj.Image });
+        InvokeAsync(() => { StateHasChanged(); });
+
+    }
+    protected async void Update()
+    {
+        det[sl].Patient_Id = obj.Patient_Id;
+        det[sl].PatientName = obj.PatientName;
+        det[sl].Gender = obj.Gender;
+        det[sl].Number = obj.Number;
+        det[sl].Date = obj.Date;
+        det[sl].Active = obj.Active;
+        det[sl].Image = obj.Image;
+        InvokeAsync(() => { StateHasChanged(); });
+    }
+    protected async void Delete(string id)
+    {
+        var d = (from a in det
+                 where a.Patient_Id == id
+                 select a).First();
+        det.Remove(d);
+        InvokeAsync(() => { StateHasChanged(); });
+    }
+    public async void Refresh()
+    {
+
+        det.Clear();
+        obj = new Patient();
+        mas = new Doctor();
+        InvokeAsync(() => { StateHasChanged(); });
+    }
+    protected async void UpdateCustomer()
+    {
+        DoctorPatientVM md = new DoctorPatientVM();
+        md.Doctors = mas;
+        md.Patients = det;
+        await Http.PutAsJsonAsync("api/DP/UpdateDoctorPatientVM", md);
+        Refresh();
+
+    }
+    protected async void DeleteCustomer()
+    {
+        await Http.DeleteAsync("api/DP/RemoveDoctorPatientVM/" + mas.Doctor_Code);
+        Refresh();
+
+    }
+    protected async void Get2Tables()
+    {
+        DoctorPatientVM md = new DoctorPatientVM();
+        md = await Http.GetFromJsonAsync<DoctorPatientVM>("api/DP/Get/" + mas.Doctor_Code);
+        if (md.Doctors != null) mas = md.Doctors;
+        if (md.Patients.Count > 0)
+            det = md.Patients;
+        else
+            det.Clear();
+    }
+    protected async void Show(string a, string b, string c, string d, int sl1,DateTime e, Boolean f, string g)
+    {
+        obj.Patient_Id = a;
+        obj.PatientName = b;
+        obj.Gender = c;
+        obj.Number = d;
+        sl = sl1;
+        obj.Date = e;
+        obj.Active = f;
+        obj.Image = g;
+    }
+
+    string Message = "No file(s) selected";
+    IReadOnlyList<IBrowserFile> selectedFiles;
+    private async Task SingleUpload(InputFileChangeEventArgs e)
+    {
+        selectedFiles = e.GetMultipleFiles();
+        foreach (var file in selectedFiles)
+        {
+            Stream stream = file.OpenReadStream();
+            var path = $"\\uploads\\{file.Name}";
+            FileStream fs = File.Create(path);
+            await stream.CopyToAsync(fs);
+            obj.Image = file.Name;
+            stream.Close();
+            fs.Close();
+        }
+        this.StateHasChanged();
+    }
+    
+
+}
